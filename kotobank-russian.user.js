@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name         コトバンク ロシア語辞典：表示補正・検索サジェスト
-// @namespace    local.kotobank.ruja
+// @namespace    https://github.com/yokoyama-midori/kotobank-russian
+// @homepageURL  https://github.com/yokoyama-midori/kotobank-russian
 // @version      1.0.0
 // @description  ロシア語辞典の表記補正、Notoフォントによる書体選択、露和・和露の前方一致候補から単語ページへの直接移動。
 // @match        https://kotobank.jp/rujaword/*
