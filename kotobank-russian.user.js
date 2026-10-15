@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         コトバンクロシア語辞典：表記の補正
+// @name         コトバンク ロシア語辞典：表示補正・検索サジェスト
 // @namespace    local.kotobank.ruja
-// @version      2.2.4
+// @version      1.0.0
 // @description  ロシア語辞典の表記補正、Notoフォントによる書体選択、露和・和露の前方一致候補から単語ページへの直接移動。
 // @match        https://kotobank.jp/rujaword/*
 // @match        https://kotobank.jp/jaruword/*
@@ -288,27 +288,6 @@
       .replace(/[\u0300\u0301]/g, '').normalize('NFC');
   }
 
-  function createPrefixIndex(words) {
-    const entries = words.map(word => ({ word, key:searchKey(word) }))
-      .sort((a,b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
-    return (query, limit = 12) => {
-      const key = searchKey(query);
-      if (!key) return [];
-      let left = 0, right = entries.length;
-      while (left < right) {
-        const middle = (left + right) >>> 1;
-        if (entries[middle].key < key) left = middle + 1;
-        else right = middle;
-      }
-      const results = [];
-      while (left < entries.length && results.length < limit && entries[left].key.startsWith(key)) {
-        const word = entries[left++].word;
-        results.push({ word, href:'https://kotobank.jp/rujaword/' + encodeURIComponent(word) });
-      }
-      return results;
-    };
-  }
-
   function compositionQuery(text, composing) {
     // IMEの未完成ローマ字だけ検索から除き、入力値や通常の英字検索は変えない。
     return composing ? text.replace(/([ぁ-ゖァ-ヶー])[a-zA-Zａ-ｚＡ-Ｚ]+$/, '$1') : text;
@@ -450,7 +429,12 @@
         input.setAttribute('aria-expanded', 'true');
         position();
       }
-      function schedule() { clearTimeout(timer); if (!pointerSelection) timer = setTimeout(render, 80); }
+      function schedule() {
+        // 入力変更後は古い候補を選べないよう、再検索を待たずに閉じる。
+        // IME確定に伴うinputでは、押下中の候補リンクを保持する。
+        close();
+        if (!pointerSelection) timer = setTimeout(render, 80);
+      }
       // IME確定時のinputで、クリック途中の候補を消さない。
       input.addEventListener('input', schedule);
       input.addEventListener('focus', schedule);
@@ -507,7 +491,7 @@
 
   // 同じ実装をオフライン検証でも使用する。
   if (typeof module === 'object' && module.exports) {
-    module.exports = { fixText, createController, searchKey, createPrefixIndex, compositionQuery, japaneseKey, readingVariants, createBilingualIndex, installSuggestions };
+    module.exports = { fixText, createController, searchKey, compositionQuery, japaneseKey, readingVariants, createBilingualIndex, installSuggestions };
     return;
   }
 
@@ -533,30 +517,28 @@
   updateMenu();
 
   // フォント上書きは常時ON。言語ごとの書体選択は独立して保存する。
+  const jpFonts = document.createElement('link');
+  jpFonts.id = 'kotobank-jp-fonts';
+  jpFonts.rel = 'stylesheet';
+  jpFonts.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&family=Noto+Serif+JP:wght@200..900&display=swap';
+  document.head.append(jpFonts);
+
   const fontStyle = document.createElement('style');
   document.head.append(fontStyle);
   const jpSerifKey = 'kotobank-ruja-jp-serif';
   const ruSerifKey = 'kotobank-ruja-ru-serif';
   let jpSerif = typeof GM_getValue === 'function' ? Boolean(GM_getValue(jpSerifKey, false)) : false;
   let ruSerif = typeof GM_getValue === 'function' ? Boolean(GM_getValue(ruSerifKey, false)) : false;
-  const faces = [
-    ['Kotobank Noto Sans', 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans%5Bwdth,wght%5D.ttf', 'normal'],
-    ['Kotobank Noto Sans', 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Italic%5Bwdth,wght%5D.ttf', 'italic'],
-    ['Kotobank Noto Serif', 'https://raw.githubusercontent.com/google/fonts/main/ofl/notoserif/NotoSerif%5Bwdth,wght%5D.ttf', 'normal'],
-    ['Kotobank Noto Serif', 'https://raw.githubusercontent.com/google/fonts/main/ofl/notoserif/NotoSerif-Italic%5Bwdth,wght%5D.ttf', 'italic'],
-    ['Kotobank Noto Sans JP', 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf', 'normal'],
-    ['Kotobank Noto Serif JP', 'https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf', 'normal'],
-  ];
-  // 未使用の書体はブラウザーが取得しない。フォント本体は拡張機能経由で転送しない。
-  const fontFaces = faces.map(([family, url, style]) => {
-    const range = family.endsWith(' JP') ? ''
-      : 'unicode-range: U+0300-036F, U+0400-052F, U+1C80-1C8F, U+2DE0-2DFF, U+A640-A69F, U+1E030-1E08F;';
-    const weight = family === 'Kotobank Noto Serif JP' ? '200 900' : '100 900';
-    return `@font-face { font-family: "${family}"; src: url("${url}") format("truetype"); font-weight: ${weight}; font-style: ${style}; font-display: swap; ${range} }`;
-  }).join('\n');
+  // キリル文字と結合アクセントだけ、ロシア語用の公式TTFを使う。
+  const fontFaces = `
+@font-face{font-family:"Kotobank Noto Sans";font-style:normal;font-weight:100 900;font-display:swap;src:url("https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans%5Bwdth,wght%5D.ttf") format("truetype");unicode-range:U+0300-036F, U+0400-052F, U+1C80-1C8F, U+2DE0-2DFF, U+A640-A69F, U+1E030-1E08F;}
+@font-face{font-family:"Kotobank Noto Sans";font-style:italic;font-weight:100 900;font-display:swap;src:url("https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Italic%5Bwdth,wght%5D.ttf") format("truetype");unicode-range:U+0300-036F, U+0400-052F, U+1C80-1C8F, U+2DE0-2DFF, U+A640-A69F, U+1E030-1E08F;}
+@font-face{font-family:"Kotobank Noto Serif";font-style:normal;font-weight:100 900;font-display:swap;src:url("https://raw.githubusercontent.com/google/fonts/main/ofl/notoserif/NotoSerif%5Bwdth,wght%5D.ttf") format("truetype");unicode-range:U+0300-036F, U+0400-052F, U+1C80-1C8F, U+2DE0-2DFF, U+A640-A69F, U+1E030-1E08F;}
+@font-face{font-family:"Kotobank Noto Serif";font-style:italic;font-weight:100 900;font-display:swap;src:url("https://raw.githubusercontent.com/google/fonts/main/ofl/notoserif/NotoSerif-Italic%5Bwdth,wght%5D.ttf") format("truetype");unicode-range:U+0300-036F, U+0400-052F, U+1C80-1C8F, U+2DE0-2DFF, U+A640-A69F, U+1E030-1E08F;}
+`;
   function applyFont() {
     const ruFamily = ruSerif ? 'Kotobank Noto Serif' : 'Kotobank Noto Sans';
-    const jpFamily = jpSerif ? 'Kotobank Noto Serif JP' : 'Kotobank Noto Sans JP';
+    const jpFamily = jpSerif ? 'Noto Serif JP' : 'Noto Sans JP';
     const fallback = jpSerif ? '"Yu Mincho", serif' : 'Meiryo, sans-serif';
     fontStyle.textContent = `${fontFaces}\n#mainTitle h1, article:is(.prj,.pjr) > h2, article:is(.prj,.pjr) > h2 *, article:is(.prj,.pjr) .ex h3, article:is(.prj,.pjr) .ex h3 *, article:is(.prj,.pjr) section.description, article:is(.prj,.pjr) section.description *, body .ruja-suggest a.ruja-suggest-option, body .ruja-suggest .ruja-suggest-heading { font-family: "${ruFamily}", "${jpFamily}", ${fallback} !important; }`;
   }
