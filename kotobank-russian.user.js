@@ -2,8 +2,8 @@
 // @name         コトバンク ロシア語辞典：表示補正・検索サジェスト
 // @namespace    https://github.com/yokoyama-midori/kotobank-russian
 // @homepageURL  https://github.com/yokoyama-midori/kotobank-russian
-// @version      1.0.0
-// @description  ロシア語辞典の表記補正、Notoフォントによる書体選択、露和・和露の前方一致候補から単語ページへの直接移動。
+// @version      1.0.1
+// @description コトバンク ロシア語辞典の表示補正、検索サジェストと単語ページへの直接移動、フォント選択
 // @match        https://kotobank.jp/rujaword/*
 // @match        https://kotobank.jp/jaruword/*
 // @run-at       document-end
@@ -374,13 +374,14 @@
       input.setAttribute('aria-autocomplete', 'list');
       input.setAttribute('aria-controls', list.id);
       input.setAttribute('aria-expanded', 'false');
-      let timer, composing = false, active = -1, pointerSelection;
+      let composing = false, active = -1, pointerSelection, renderedQuery;
       const select = input.form.querySelector('select[name="t"]');
       const eligible = () => !select || ['rj','jr','all'].includes(select.value);
       function close() {
-        clearTimeout(timer);
         if (pointerSelection) return;
+        renderedQuery = undefined;
         panel.hidden = true;
+        list.children[active]?.setAttribute('aria-selected', 'false');
         active = -1;
         input.setAttribute('aria-expanded', 'false');
         input.removeAttribute('aria-activedescendant');
@@ -395,17 +396,24 @@
         panel.style.width = Math.min(rect.width, doc.defaultView.innerWidth - Math.max(0,rect.left)) + 'px';
         panel.style.maxHeight = Math.max(0, Math.min(360, doc.defaultView.innerHeight - rect.bottom - 8)) + 'px';
       }
-      function render() {
-        clearTimeout(timer);
+      function choose(index, automatic = false) {
+        const links = [...list.children];
+        active = index;
+        links.forEach((link,i) => link.setAttribute('aria-selected', String(i === active)));
+        input.setAttribute('aria-activedescendant', links[active].id);
+        if (!automatic) links[active].scrollIntoView({ block:'nearest' });
+      }
+      function render(automatic = true) {
         if (pointerSelection) return;
         const query = compositionQuery(input.value, composing);
         if (doc.activeElement !== input || !eligible() || !searchKey(query)) { close(); return; }
+        if (!panel.hidden && renderedQuery === query) return;
         // 初めて入力するときにだけ索引を作り、以後は同じ索引を再利用する。
         if (!search) search = getIndex();
         const results = search(query);
-        closers.forEach(fn => fn());
-        list.replaceChildren();
-        if (!results.length) return;
+        closers.forEach(fn => { if (fn !== close) fn(); });
+        if (!results.length) { close(); return; }
+        const fragment = doc.createDocumentFragment();
         for (const [i, result] of results.entries()) {
           const link = doc.createElement('a');
           link.className = 'ruja-suggest-option';
@@ -424,40 +432,46 @@
           link.setAttribute('role', 'option');
           link.setAttribute('aria-selected', 'false');
           link.tabIndex = -1;
-          list.append(link);
+          fragment.append(link);
         }
+        // 表示中の一覧を隠さず、一度のDOM更新で最新の候補に置き換える。
+        list.replaceChildren(fragment);
+        renderedQuery = query;
+        active = -1;
+        input.removeAttribute('aria-activedescendant');
         panel.hidden = false;
         input.setAttribute('aria-expanded', 'true');
         position();
+        if (automatic) choose(0, true);
       }
       function schedule() {
-        // 入力変更後は古い候補を選べないよう、再検索を待たずに閉じる。
-        // IME確定に伴うinputでは、押下中の候補リンクを保持する。
-        close();
-        if (!pointerSelection) timer = setTimeout(render, 80);
+        // 通信を伴わない検索なので、待機せず更新し、古い候補の選択も防ぐ。
+        render();
       }
       // IME確定時のinputで、クリック途中の候補を消さない。
       input.addEventListener('input', schedule);
       input.addEventListener('focus', schedule);
       input.addEventListener('blur', close);
-      input.addEventListener('compositionstart', () => { composing = true; close(); });
+      input.addEventListener('compositionstart', () => {
+        composing = true; schedule();
+      });
       input.addEventListener('compositionupdate', schedule);
-      input.addEventListener('compositionend', () => { composing = false; schedule(); });
+      input.addEventListener('compositionend', () => {
+        composing = false; schedule();
+      });
       input.addEventListener('keydown', event => {
         if (composing || event.isComposing || event.keyCode === 229) return;
         if (event.key === 'Escape') { close(); return; }
         const tab = event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey;
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || (tab && !panel.hidden)) {
-          if (panel.hidden) render();
+          if (panel.hidden) render(false);
           if (panel.hidden) return;
           event.preventDefault();
           const links = [...list.children];
           const forward = event.key === 'ArrowDown' || (tab && !event.shiftKey);
-          active = active < 0 ? (forward ? 0 : links.length - 1)
+          const next = active < 0 ? (forward ? 0 : links.length - 1)
             : (active + (forward ? 1 : -1) + links.length) % links.length;
-          links.forEach((link,i) => link.setAttribute('aria-selected', String(i === active)));
-          input.setAttribute('aria-activedescendant', links[active].id);
-          links[active].scrollIntoView({ block:'nearest' });
+          choose(next);
         } else if (event.key === 'Enter' && !panel.hidden && active >= 0) {
           event.preventDefault();
           list.children[active].click();
@@ -469,7 +483,6 @@
         const link = event.target.closest('a.ruja-suggest-option');
         if (event.button !== 0 || !link) return;
         pointerSelection = { link, pointerId:event.pointerId };
-        clearTimeout(timer);
       }, true);
       function releasePointer(event) {
         if (!pointerSelection || event.pointerId !== pointerSelection.pointerId) return;
@@ -508,10 +521,10 @@
   function updateMenu() {
     if (typeof GM_registerMenuCommand !== 'function') return;
     menuId = GM_registerMenuCommand(
-      controller.isEnabled() ? '✓ 表記補正：ON' : '□ 表記補正：OFF',
+      controller.isEnabled() ? '✓ 表示補正：ON' : '□ 表示補正：OFF',
       () => {
         setCorrectionEnabled(!controller.isEnabled());
-      }, { id:menuId, autoClose:false, title:'クリックで表記補正のON/OFFを切り替えます' });
+      }, { id:menuId, autoClose:false, title:'クリックで表示補正のON/OFFを切り替えます' });
   }
   controller.setEnabled(typeof GM_getValue === 'function' ? GM_getValue(storageKey, true) : true);
   controller.observe();
