@@ -2,7 +2,7 @@
 // @name         コトバンク ロシア語辞典：表示補正・検索サジェスト
 // @namespace    https://github.com/yokoyama-midori/kotobank-russian
 // @homepageURL  https://github.com/yokoyama-midori/kotobank-russian
-// @version      1.0.1
+// @version      1.0.2
 // @description コトバンク ロシア語辞典の表示補正、検索サジェストと単語ページへの直接移動、フォント選択
 // @match        https://kotobank.jp/rujaword/*
 // @match        https://kotobank.jp/jaruword/*
@@ -14,6 +14,16 @@
 // ==/UserScript==
 
 (() => {
+  'use strict';
+
+  // BEGIN GENERATED CORRECTIONS
+  const corrections = (() => {
+    const module = { exports: {} };
+// Shared dictionary corrections. No search data, Tampermonkey API or stylesheet.
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.KotobankRussianCorrections = factory();
+})(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
   const ROOT_SELECTOR = 'article:is(.prj,.pjr) section.description';
@@ -35,12 +45,11 @@
         label.split('・').every(part => USAGE_LABELS.has(part)) ? `｟${label}｠` : whole);
   }
 
-  function createController(doc) {
+  function createController(doc, options = {}) {
     const originals = new Map();
     const observers = [];
     const decorations = new Map();
     const columnWrappers = new Set();
-    let boxStyle;
     let enabled = true;
     let applying = false;
     let pendingUpdate;
@@ -131,33 +140,7 @@
           columnWrappers.add(label);
         }
       }
-      if (roots.length && !boxStyle) {
-        boxStyle = doc.createElement('style');
-        boxStyle.textContent = `
-          body.pageWord { font-size:18px !important; }
-          article.prj section.description { font-size:18px !important; }
-          article.prj section.description [data-orgtag="subheadword"] { margin:0 !important; }
-          article.pjr section.description [data-orgtag="subheadword"] { font-weight:700 !important; }
-          article.prj section.description [data-orgtag="subhead"] { margin-inline-start:1em !important; }
-          article.prj section.description [data-orgtag="example"] { margin-inline-start:1em !important; color:#666 !important; }
-          article.prj section.description [data-orgtag="example"] * { color:inherit !important; }
-          article.pjr section.description [data-orgtag="example"][type="活用"] { color:inherit !important; }
-          article.prj section.description :is([data-ruja-box], .white-square) {
-            box-sizing:border-box; display:inline-block; position:relative;
-            min-width:1.25em; height:1.25em; line-height:1.25;
-            border:0 !important; padding:0 .1em; margin:0 .05em;
-            font-size:.82em; font-style:normal; font-weight:400;
-            vertical-align:.02em; text-align:center; white-space:nowrap; letter-spacing:0;
-          }
-          article.prj section.description :is([data-ruja-box], .white-square)::before {
-            content:""; box-sizing:border-box; position:absolute; inset:0;
-            border:1px solid currentColor; border-radius:.2em; pointer-events:none;
-          }
-          article.prj [data-ruja-box] > span, article.prj [data-ruja-column-label] { position:relative; top:-.035em; }
-          article.prj [data-ruja-italic] { font-style:italic; }
-        `.replaceAll('article.prj', 'article:is(.prj,.pjr)');
-        doc.head.append(boxStyle);
-      }
+
     }
 
     function applyHeadingCorrections(roots) {
@@ -234,6 +217,7 @@
           }
         }
         applyBoxes(roots, italicHints);
+        if (roots.length) options.onApply?.();
       } finally {
         // 自分の補正によるMutationObserverの再発火を抑える。
         for (const observer of observers) observer.takeRecords();
@@ -244,8 +228,7 @@
     function restore() {
       if (pendingUpdate !== undefined) { clearTimeout(pendingUpdate); pendingUpdate = undefined; }
       removeBoxes();
-      boxStyle?.remove();
-      boxStyle = undefined;
+      options.onRestore?.();
       for (const [node, record] of originals) {
         // サイト側がさらに変更したテキストを上書きしない。
         if (node.nodeValue === record.corrected) node.nodeValue = record.original;
@@ -281,6 +264,31 @@
       disconnect: () => { for (const o of observers) o.disconnect(); observers.length = 0;
         if (pendingUpdate !== undefined) clearTimeout(pendingUpdate); pendingUpdate = undefined; },
       isEnabled: () => enabled };
+  }
+
+  return { fixText, createController };
+});
+
+    return module.exports;
+  })();
+  const CORRECTION_CSS = "body.pageWord { font-size:18px !important; }\narticle:is(.prj,.pjr) section.description { font-size:18px !important; }\narticle:is(.prj,.pjr) section.description [data-orgtag=\"subheadword\"] { margin:0 !important; }\narticle.pjr section.description [data-orgtag=\"subheadword\"] { font-weight:700 !important; }\narticle:is(.prj,.pjr) section.description [data-orgtag=\"subhead\"] { margin-inline-start:1em !important; }\narticle:is(.prj,.pjr) section.description [data-orgtag=\"example\"] { margin-inline-start:1em !important; color:#666 !important; }\narticle:is(.prj,.pjr) section.description [data-orgtag=\"example\"] * { color:inherit !important; }\narticle.pjr section.description [data-orgtag=\"example\"][type=\"活用\"] { color:inherit !important; }\narticle:is(.prj,.pjr) section.description :is([data-ruja-box], .white-square) {\n  box-sizing:border-box; display:inline-block; position:relative;\n  min-width:1.25em; height:1.25em; line-height:1.25;\n  border:0 !important; padding:0 .1em; margin:0 .05em;\n  font-size:.82em; font-style:normal; font-weight:400;\n  vertical-align:.02em; text-align:center; white-space:nowrap; letter-spacing:0;\n}\narticle:is(.prj,.pjr) section.description :is([data-ruja-box], .white-square)::before {\n  content:\"\"; box-sizing:border-box; position:absolute; inset:0;\n  border:1px solid currentColor; border-radius:.2em; pointer-events:none;\n}\narticle:is(.prj,.pjr) [data-ruja-box] > span, article:is(.prj,.pjr) [data-ruja-column-label] { position:relative; top:-.035em; }\narticle:is(.prj,.pjr) [data-ruja-italic] { font-style:italic; }\n";
+  // END GENERATED CORRECTIONS
+
+  const { fixText } = corrections;
+  function createController(doc) {
+    let style;
+    return corrections.createController(doc, {
+      onApply() {
+        if (style) return;
+        style = doc.createElement('style');
+        style.textContent = CORRECTION_CSS;
+        doc.head.append(style);
+      },
+      onRestore() {
+        style?.remove();
+        style = undefined;
+      },
+    });
   }
 
   function searchKey(text) {

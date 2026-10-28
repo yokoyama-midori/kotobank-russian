@@ -1,0 +1,21 @@
+body.pageWord { font-size:18px !important; }
+article:is(.prj,.pjr) section.description { font-size:18px !important; }
+article:is(.prj,.pjr) section.description [data-orgtag="subheadword"] { margin:0 !important; }
+article.pjr section.description [data-orgtag="subheadword"] { font-weight:700 !important; }
+article:is(.prj,.pjr) section.description [data-orgtag="subhead"] { margin-inline-start:1em !important; }
+article:is(.prj,.pjr) section.description [data-orgtag="example"] { margin-inline-start:1em !important; color:#666 !important; }
+article:is(.prj,.pjr) section.description [data-orgtag="example"] * { color:inherit !important; }
+article.pjr section.description [data-orgtag="example"][type="活用"] { color:inherit !important; }
+article:is(.prj,.pjr) section.description :is([data-ruja-box], .white-square) {
+  box-sizing:border-box; display:inline-block; position:relative;
+  min-width:1.25em; height:1.25em; line-height:1.25;
+  border:0 !important; padding:0 .1em; margin:0 .05em;
+  font-size:.82em; font-style:normal; font-weight:400;
+  vertical-align:.02em; text-align:center; white-space:nowrap; letter-spacing:0;
+}
+article:is(.prj,.pjr) section.description :is([data-ruja-box], .white-square)::before {
+  content:""; box-sizing:border-box; position:absolute; inset:0;
+  border:1px solid currentColor; border-radius:.2em; pointer-events:none;
+}
+article:is(.prj,.pjr) [data-ruja-box] > span, article:is(.prj,.pjr) [data-ruja-column-label] { position:relative; top:-.035em; }
+article:is(.prj,.pjr) [data-ruja-italic] { font-style:italic; }
