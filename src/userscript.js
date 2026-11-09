@@ -2,7 +2,7 @@
 // @name         コトバンク ロシア語辞典：表示補正・検索サジェスト
 // @namespace    https://github.com/yokoyama-midori/kotobank-russian
 // @homepageURL  https://github.com/yokoyama-midori/kotobank-russian
-// @version      1.0.2
+// @version      1.0.3
 // @description コトバンク ロシア語辞典の表示補正、検索サジェストと単語ページへの直接移動、フォント選択
 // @match        https://kotobank.jp/rujaword/*
 // @match        https://kotobank.jp/jaruword/*

@@ -2,7 +2,7 @@
 // @name         コトバンク ロシア語辞典：表示補正・検索サジェスト
 // @namespace    https://github.com/yokoyama-midori/kotobank-russian
 // @homepageURL  https://github.com/yokoyama-midori/kotobank-russian
-// @version      1.0.2
+// @version      1.0.3
 // @description コトバンク ロシア語辞典の表示補正、検索サジェストと単語ページへの直接移動、フォント選択
 // @match        https://kotobank.jp/rujaword/*
 // @match        https://kotobank.jp/jaruword/*
@@ -96,11 +96,21 @@
           for (const node of nodes) {
             const text = node.nodeValue;
             const boxes = [...text.matchAll(/\[(主|生|与|対|造|前|不定形|命令形|比較級|従属節)\]/g)].filter(match => {
-              if (root.closest('article.pjr') || match[1] !== '前' || element !== firstMeaning) return true;
+              if (root.closest('article.pjr') || match[1] !== '前') return true;
               const range = doc.createRange();
               range.selectNodeContents(element);
               range.setEnd(node, match.index);
-              const offset = range.toString().length;
+              const before = range.toString();
+              // 山括弧内は格指定。用例でも山括弧の外に格指定が現れる。
+              if (before.lastIndexOf('〈') > before.lastIndexOf('〉')) return true;
+              if (!element.matches('[data-orgtag="meaning"]')) return true;
+              // 品詞の区分は、最初の語義以外にもⅡ[前]などとして現れる。
+              if (!before.trim() || /[Ⅰ-Ⅿ]\s*$/u.test(before)) return false;
+              if (element !== firstMeaning) return true;
+              // 本文冒頭の発音・英訳注記に続く品詞表示も除外する。
+              // ロシア語に続くо [前]などは格指定として残す。
+              if (/[\p{Script=Cyrillic}]/u.test(before)) return true;
+              const offset = before.length;
               const first = element.textContent.indexOf('[前]');
               const body = element.textContent.search(/[①-⑳〈]/);
               return offset !== first || (body >= 0 && offset > body);
