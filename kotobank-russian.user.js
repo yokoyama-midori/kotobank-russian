@@ -2,7 +2,7 @@
 // @name         コトバンク ロシア語辞典：表示補正・検索サジェスト
 // @namespace    https://github.com/yokoyama-midori/kotobank-russian
 // @homepageURL  https://github.com/yokoyama-midori/kotobank-russian
-// @version      1.0.3
+// @version      1.0.4
 // @description コトバンク ロシア語辞典の表示補正、検索サジェストと単語ページへの直接移動、フォント選択
 // @match        https://kotobank.jp/rujaword/*
 // @match        https://kotobank.jp/jaruword/*
@@ -105,7 +105,8 @@
               if (before.lastIndexOf('〈') > before.lastIndexOf('〉')) return true;
               if (!element.matches('[data-orgtag="meaning"]')) return true;
               // 品詞の区分は、最初の語義以外にもⅡ[前]などとして現れる。
-              if (!before.trim() || /[Ⅰ-Ⅿ]\s*$/u.test(before)) return false;
+              // 語義番号（①など）の直後も品詞表示。例: ②[前]〈[生]〉
+              if (!before.trim() || /[Ⅰ-Ⅿ①-⑳]\s*$/u.test(before)) return false;
               if (element !== firstMeaning) return true;
               // 本文冒頭の発音・英訳注記に続く品詞表示も除外する。
               // ロシア語に続くо [前]などは格指定として残す。
