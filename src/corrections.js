@@ -86,6 +86,8 @@
               // 品詞の区分は、最初の語義以外にもⅡ[前]などとして現れる。
               // 語義番号（①など）の直後も品詞表示。例: ②[前]〈[生]〉
               if (!before.trim() || /[Ⅰ-Ⅿ①-⑳]\s*$/u.test(before)) return false;
+              // 直後に英訳〔on, onto, at〕が続く[前]は品詞表示。直前に注記中のロシア語があっても同じ。
+              if (/^\s*〔/u.test(element.textContent.slice(before.length + match[0].length))) return false;
               if (element !== firstMeaning) return true;
               // 本文冒頭の発音・英訳注記に続く品詞表示も除外する。
               // ロシア語に続くо [前]などは格指定として残す。
